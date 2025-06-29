@@ -412,25 +412,22 @@ function createDefaultCollection() {
 }
 
 function toggleCollection(collectionId) {
-    const collection = bookmarkManagerData.collections.find(c => c.id === collectionId);
-    if (collection) {
-        collection.isOpen = !collection.isOpen;
-        collection.lastModified = Date.now();
-        
-        // Hitta collection-elementet och uppdatera dess klasser
-        const collectionElement = document.querySelector(`.collection[data-collection-id="${collectionId}"]`);
-        if (collectionElement) {
-            collectionElement.classList.toggle('is-open', collection.isOpen);
-            
-            // Uppdatera bookmarks container display
-            const bookmarksContainer = collectionElement.querySelector('.bookmarks');
-            if (bookmarksContainer) {
-                bookmarksContainer.style.display = collection.isOpen ? 'flex' : 'none';
-            }
-        }
-        
-        saveToLocalStorage();
-    }
+    const clickedCollection = bookmarkManagerData.collections.find(c => c.id === collectionId);
+    if (!clickedCollection) return;
+
+    const wasOpen = clickedCollection.isOpen;
+
+    // Close all collections
+    bookmarkManagerData.collections.forEach(c => {
+        c.isOpen = false;
+    });
+
+    // Toggle the clicked one
+    clickedCollection.isOpen = !wasOpen;
+    clickedCollection.lastModified = Date.now();
+
+    saveToLocalStorage();
+    renderCollections(); // Re-render to apply changes
 }
 
 function launchAllTabs(collectionId) {
@@ -1064,11 +1061,26 @@ document.addEventListener('DOMContentLoaded', () => {
         body.dark-mode .bookmark-menu-dropdown { background-color: #333; border-color: #555; }
         body.dark-mode .bookmark-menu-item:hover { background-color: #444; }
         .bookmark h3 .inline-edit-input { width: 100%; box-sizing: border-box; font-size: 12px; }
-        .bookmark { padding: 8px; height: 50px; display: flex; flex-direction: column; justify-content: center; }
-        .bookmark-header { display: flex; align-items: center; gap: 8px; }
-        .bookmark-header img { width: 20px; height: 20px; }
-        .bookmark h3 { margin: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bookmark { padding: 4px 8px; height: 32px; display: flex; flex-direction: column; justify-content: center; }
+        .bookmark-header { display: flex; align-items: center; gap: 6px; }
+        .bookmark-header img { width: 16px; height: 16px; flex-shrink: 0; }
+        .bookmark h3 { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bookmark p { display: none; }
+        #collections {
+            display: flex;
+            flex-direction: column;
+            gap: 8px; /* Reduced gap */
+            padding: 16px;
+            height: 100%;
+            overflow-y: auto;
+        }
+        .collection {
+            width: 100%; /* Full width of padded container */
+            flex-shrink: 0;
+        }
+        .bookmarks { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+        .collection.collapsed .bookmarks { display: none; }
+        .drag-handle { cursor: pointer; }
     `;
     document.head.appendChild(style);
 
@@ -1633,14 +1645,26 @@ function createBookmarkElement(bookmark, collectionId) {
     bookmarkElement.dataset.bookmarkId = bookmark.id;
 
     const bookmarkIcon = document.createElement('img');
-    // Use Chrome's internal favicon service for better reliability and performance.
-    bookmarkIcon.src = `chrome://favicon/size/32/${bookmark.url}`;
     bookmarkIcon.alt = 'Icon';
-    // Fallback to a self-contained SVG globe icon if the favicon fails to load.
-    bookmarkIcon.onerror = function() {
-        this.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L8 12v1c0 1.1.9 2 2 2v3.93zm9.79-2.14c-.19.48-.41.93-.67 1.36l-1.12-1.12V15c0-1.1-.9-2-2-2v-1l3.79-3.79c.13.58.21 1.17.21 1.79 0 4.08-3.05 7.44-7 7.93z"/></svg>';
-        this.onerror = null; // Prevents infinite loops if the fallback also fails.
+
+    const finalFallback = () => {
+        bookmarkIcon.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L8 12v1c0 1.1.9 2 2 2v3.93zm9.79-2.14c-.19.48-.41.93-.67 1.36l-1.12-1.12V15c0-1.1-.9-2-2-2v-1l3.79-3.79c.13.58.21 1.17.21 1.79 0 4.08-3.05 7.44-7 7.93z"/></svg>';
+        bookmarkIcon.onerror = null; // Prevent infinite loops
     };
+
+    const tryChromeFavicon = () => {
+        bookmarkIcon.src = `chrome://favicon/size/32/${bookmark.url}`;
+        bookmarkIcon.onerror = finalFallback;
+    };
+
+    try {
+        const domain = new URL(bookmark.url).hostname;
+        bookmarkIcon.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        bookmarkIcon.onerror = tryChromeFavicon;
+    } catch (e) {
+        // If URL is invalid, go straight to chrome favicon service
+        tryChromeFavicon();
+    }
 
     const bookmarkTitle = document.createElement('h3');
     // Use custom title if it exists, otherwise the original title
@@ -1714,7 +1738,8 @@ function renderCollections() {
 
     sortedCollections.forEach((collection) => {
         const collectionElement = document.createElement('div');
-        collectionElement.className = `collection ${collection.isOpen ? 'is-open' : ''}`;
+        // Add 'collapsed' class if collection is not open. Default for isOpen is undefined (falsy), so it works.
+        collectionElement.className = `collection ${!collection.isOpen ? 'collapsed' : ''}`;
         collectionElement.setAttribute('draggable', true);
         collectionElement.dataset.collectionId = collection.id;
 
@@ -1722,7 +1747,7 @@ function renderCollections() {
         const header = document.createElement('div');
         header.className = 'collection-header';
 
-        // Drag Handle
+        // Drag Handle (also acts as toggle)
         const dragHandle = document.createElement('span');
         dragHandle.className = 'drag-handle';
         dragHandle.textContent = '☰';
@@ -1732,20 +1757,12 @@ function renderCollections() {
         const titleArea = document.createElement('div');
         titleArea.className = 'collection-title-area';
         
-        // Collection Title
         const title = document.createElement('h2');
         title.textContent = collection.name;
-
-        // Toggle Button
-        const toggleBtn = document.createElement('button');
-        toggleBtn.className = 'toggle-collection';
-        toggleBtn.textContent = collection.isOpen ? '∨' : '∧';
 
         // Action Buttons
         const actions = document.createElement('div');
         actions.className = 'collection-actions';
-
-        // Skapa alla knappar
         const buttons = [
             { className: 'launch-collection', text: '🚀', title: 'Open all these webpages in a Chrome tab group', action: () => launchCollection(collection.id) },
             { className: 'openall-collection', icon: 'outbox', title: 'Open all webpages in this collection', action: () => launchAllTabs(collection.id) },
@@ -1756,39 +1773,32 @@ function renderCollections() {
             { className: 'move-collection', text: '▼', title: 'Move collection down', action: () => moveCollection(collection.id, 1) },
             { className: 'delete-collection', text: '🗑️', title: 'Delete collection', action: () => deleteCollection(collection.id) }
         ];
-
         buttons.forEach(btnConfig => {
             const btn = document.createElement('button');
             btn.className = `collection-button ${btnConfig.className}`;
             btn.title = btnConfig.title;
             btn.addEventListener('click', btnConfig.action);
-          
-            // Kolla om vi ska använda SVG i stället för text
             if (btnConfig.icon === 'inbox') {
               btn.innerHTML = svgInbox;
             } else if (btnConfig.icon === 'outbox') {
               btn.innerHTML = svgOutbox;
             } else {
-              // Annars använd vanlig text
               btn.textContent = btnConfig.text;
             }
-          
             actions.appendChild(btn);
-          });
+        });
 
-        // Bygg ihop headern
+        // Assemble Header (without the old toggle button)
         titleArea.appendChild(dragHandle);
         titleArea.appendChild(title);
-        titleArea.appendChild(toggleBtn);
         header.appendChild(titleArea);
         header.appendChild(actions);
 
         // Bookmarks Container
         const bookmarksContainer = document.createElement('div');
         bookmarksContainer.className = 'bookmarks';
-        bookmarksContainer.style.display = collection.isOpen ? 'flex' : 'none';
+        // Visibility is now handled by the .collapsed class in CSS
 
-        // Lägg till bokmärken (filtrera bort raderade)
         collection.bookmarks
             .filter(b => !b.deleted)
             .sort((a, b) => a.position - b.position)
@@ -1797,7 +1807,6 @@ function renderCollections() {
                 bookmarksContainer.appendChild(bookmarkElement);
             });
 
-        // Lägg till "dra hit" om tom
         if (bookmarksContainer.children.length === 0) {
             const emptyMsg = document.createElement('div');
             emptyMsg.className = 'empty-collection-message';
@@ -1810,17 +1819,16 @@ function renderCollections() {
         // Event Listeners
         dragHandle.addEventListener('dragstart', dragStartCollection);
         dragHandle.addEventListener('dragend', dragEnd);
-        toggleBtn.addEventListener('click', () => toggleCollection(collection.id));
+        // The drag handle now also toggles the collection visibility on click
+        dragHandle.addEventListener('click', () => toggleCollection(collection.id));
 
-        // Sammansätt allt
+        // Assemble the final collection element
         collectionElement.appendChild(header);
         collectionElement.appendChild(bookmarksContainer);
         collectionsContainer.appendChild(collectionElement);
 
-        // Draghanterare för hela collection
         addCollectionDragListeners(collectionElement);
 
-        // Trigger the filter to reapply after rendering
         const searchBox = document.getElementById('searchBox');
         if (searchBox) {
             const event = new Event('input');
