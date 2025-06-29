@@ -965,9 +965,111 @@ window.addEventListener('storage', (event) => {
   });
 
 // Initialiseringskod
+function addBookmarkEventListeners() {
+    const collectionsContainer = document.getElementById('collections');
+    if (!collectionsContainer) return;
+
+    collectionsContainer.addEventListener('click', (e) => {
+        const bookmarkElement = e.target.closest('.bookmark');
+        if (!bookmarkElement) return;
+
+        const collectionId = bookmarkElement.dataset.collectionId;
+        const bookmarkId = bookmarkElement.dataset.bookmarkId;
+
+        if (e.target.matches('.bookmark-menu-button')) {
+            e.stopPropagation();
+            const dropdown = e.target.nextElementSibling;
+            document.querySelectorAll('.bookmark-menu-dropdown').forEach(d => {
+                if (d !== dropdown) d.style.display = 'none';
+            });
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+            return;
+        }
+
+        if (e.target.matches('.edit-bookmark')) {
+            e.stopPropagation();
+            e.target.closest('.bookmark-menu-dropdown').style.display = 'none';
+
+            const collection = bookmarkManagerData.collections.find(c => c.id === collectionId);
+            if (!collection) return;
+            const bookmark = collection.bookmarks.find(b => b.id === bookmarkId);
+            if (!bookmark) return;
+
+            const bookmarkTitle = bookmarkElement.querySelector('h3');
+            const currentTitle = bookmark.customTitle || bookmark.title;
+            const escapedTitle = currentTitle.replace(/'/g, "&apos;").replace(/"/g, "&quot;");
+            bookmarkTitle.innerHTML = `<input type='text' value='${escapedTitle}' class='inline-edit-input' />`;
+            const input = bookmarkTitle.querySelector('input');
+            input.focus();
+            input.select();
+
+            const saveChanges = () => {
+                const newTitle = input.value.trim();
+                bookmark.customTitle = newTitle;
+                bookmark.lastModified = Date.now();
+                collection.lastModified = Date.now();
+                saveToLocalStorage();
+                renderCollections();
+            };
+
+            input.addEventListener('blur', saveChanges, { once: true });
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    input.blur();
+                } else if (event.key === 'Escape') {
+                    renderCollections();
+                }
+            });
+            return;
+        }
+
+        if (e.target.matches('.delete-bookmark')) {
+            e.stopPropagation();
+            deleteBookmark(collectionId, bookmarkId);
+            return;
+        }
+
+        if (!e.target.closest('.bookmark-menu')) {
+            const collection = bookmarkManagerData.collections.find(c => c.id === collectionId);
+            if (!collection) return;
+            const bookmark = collection.bookmarks.find(b => b.id === bookmarkId);
+            if (!bookmark) return;
+
+            if (bookmarkManagerData.openInNewTab) {
+                chrome.tabs.create({ url: bookmark.url });
+            } else {
+                chrome.tabs.update({ url: bookmark.url });
+            }
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.matches('.bookmark-menu-button')) {
+            document.querySelectorAll('.bookmark-menu-dropdown').forEach(d => {
+                d.style.display = 'none';
+            });
+        }
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    const style = document.createElement('style');
+    style.textContent = `
+        .bookmark { position: relative; }
+        .bookmark-menu { position: absolute; top: 2px; right: 5px; }
+        .bookmark-menu-button { background: none; border: none; cursor: pointer; font-size: 18px; padding: 0; line-height: 1; color: inherit; }
+        .bookmark-menu-dropdown { display: none; position: absolute; right: 0; top: 20px; background-color: white; border: 1px solid #ccc; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+        .bookmark-menu-item { padding: 8px 12px; cursor: pointer; white-space: nowrap; font-size: 12px; }
+        .bookmark-menu-item:hover { background-color: #f0f0f0; }
+        body.dark-mode .bookmark-menu-dropdown { background-color: #333; border-color: #555; }
+        body.dark-mode .bookmark-menu-item:hover { background-color: #444; }
+        .bookmark h3 .inline-edit-input { width: 100%; box-sizing: border-box; font-size: 12px; }
+    `;
+    document.head.appendChild(style);
+
     loadFromLocalStorage();
     renderCollections();
+    addBookmarkEventListeners();
     fetchChromeTabs();
     setInterval(fetchChromeTabs, 5000);
 
@@ -993,7 +1095,9 @@ document.addEventListener('DOMContentLoaded', () => {
         'wp_img12.png',
         'wp_img13.png',
         'wp_img14.png',
-        'wp_img15.png'
+        'wp_img15.png',
+        'wp_img16.png',
+        'wp_img17.png'
     ];
     const savedBackground = localStorage.getItem('backgroundImage');
     let selectedThumbnail = null; // Variabel för att hålla reda på den valda miniatyren
@@ -1515,7 +1619,7 @@ function validateDataStructure(data) {
 }
 
 function createBookmarkElement(bookmark, collectionId) {
-    if (bookmark.deleted) return null; // ❌ Filtrera här
+    if (bookmark.deleted) return null; // Filtrera här
     const bookmarkElement = document.createElement('div');
     bookmarkElement.className = 'bookmark';
     bookmarkElement.setAttribute('draggable', 'true');
@@ -1534,36 +1638,25 @@ function createBookmarkElement(bookmark, collectionId) {
     bookmarkDescription.textContent = bookmark.description || '';
     bookmarkDescription.title = bookmark.description || '';
 
-    const editIcon = document.createElement('span');
-    editIcon.className = 'edit-icon';
-    editIcon.textContent = '✏️';
-
-    const deleteIcon = document.createElement('span');
-    deleteIcon.className = 'delete-icon';
-    deleteIcon.textContent = '🗑️';
+    const menu = document.createElement('div');
+    menu.className = 'bookmark-menu';
+    menu.innerHTML = `
+        <button class="bookmark-menu-button">⋮</button>
+        <div class="bookmark-menu-dropdown">
+            <div class="bookmark-menu-item edit-bookmark">Edit</div>
+            <div class="bookmark-menu-item delete-bookmark">Delete</div>
+        </div>
+    `;
+    bookmarkElement.appendChild(menu);
 
     bookmarkElement.appendChild(bookmarkIcon);
     bookmarkElement.appendChild(bookmarkTitle);
     bookmarkElement.appendChild(bookmarkDescription);
-    bookmarkElement.appendChild(editIcon);
-    bookmarkElement.appendChild(deleteIcon);
 
     bookmarkElement.addEventListener('dragstart', dragStartBookmark);
     bookmarkElement.addEventListener('dragend', dragEnd);
     bookmarkElement.addEventListener('dragover', dragOverBookmark);
     bookmarkElement.addEventListener('drop', dropBookmark);
-
-    editIcon.addEventListener('click', (e) => {
-        e.stopPropagation();
-        editBookmark(collectionId, bookmark.id);
-    });
-
-    deleteIcon.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deleteBookmark(collectionId, bookmark.id);
-    });
-    
-    bookmarkElement.addEventListener('click', () => openBookmark(collectionId, bookmark.id));
 
     // Lägg till hover-effekter
     bookmarkElement.addEventListener('dragover', function(e) {
