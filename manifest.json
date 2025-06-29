@@ -22,12 +22,13 @@
   "permissions": [
     "tabs",
     "windows", 
-    "tabGroups"
+    "tabGroups",
+    "favicon"
   ],
   "chrome_url_overrides": {
     "newtab": "bm.html"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self' data: blob: https:;"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; img-src 'self' data: blob: https: chrome://favicon/;"
   }
 }
