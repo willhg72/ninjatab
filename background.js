@@ -51,31 +51,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
     });
     return true;
-  }else if (message.action === 'fetchFavicon') {
+  } else if (message.action === 'fetchFavicon') {
     const { url } = message;
+    try {
+      const domain = new URL(url).hostname;
+      const faviconUrl = `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 
-    // Asynkron funktion för att hämta favicon från Googles S2-tjänst
-    async function fetchGoogleFavicon(url) {
-      try {
-        const domain = new URL(url).hostname;
-        const faviconUrl = `https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(url)}&size=32`;
-        //const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-        const response = await fetch(faviconUrl);
-        if (response.ok) {
-          sendResponse({ faviconUrl }); // Returnera favicon URL
-        } else {
-          sendResponse({ faviconUrl: 'default-icon.png' }); // Om favicon inte hittas
-        }
-      } catch (error) {
-        console.error('Error fetching favicon:', error);
-        sendResponse({ faviconUrl: 'default-icon.png' }); // Vid fel, returnera default favicon
-      }
+      fetch(faviconUrl)
+        .then(response => {
+          if (!response.ok) throw new Error('Favicon response not OK');
+          return response.blob();
+        })
+        .then(blob => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            sendResponse({ dataUrl: reader.result });
+          };
+          reader.readAsDataURL(blob);
+        })
+        .catch(error => {
+          console.warn(`Failed to fetch favicon for ${domain}:`, error);
+          sendResponse({ dataUrl: null });
+        });
+    } catch (e) {
+        console.warn(`Invalid URL for favicon fetch: ${url}`);
+        sendResponse({ dataUrl: null });
     }
 
-    // Anropa funktionen för att hämta favicon
-    fetchGoogleFavicon(url);
-
-    return true; // Behöver returnera true för att indikera asynkron hantering
+    return true; // Keep message channel open for async response
   } else if (message.action === 'launchCollection') {
     const urls = message.urls;
     const collectionName = message.collectionName;

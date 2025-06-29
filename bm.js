@@ -1061,9 +1061,9 @@ document.addEventListener('DOMContentLoaded', () => {
         body.dark-mode .bookmark-menu-dropdown { background-color: #333; border-color: #555; }
         body.dark-mode .bookmark-menu-item:hover { background-color: #444; }
         .bookmark h3 .inline-edit-input { width: 100%; box-sizing: border-box; font-size: 12px; }
-        .bookmark { padding: 4px 8px; height: 32px; display: flex; flex-direction: column; justify-content: center; }
-        .bookmark-header { display: flex; align-items: center; gap: 6px; }
-        .bookmark-header img { width: 16px; height: 16px; flex-shrink: 0; }
+        .bookmark { padding: 6px 8px; height: 36px; display: flex; align-items: center; justify-content: space-between; }
+        .bookmark-header { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+        .bookmark-header img { width: 20px; height: 20px; flex-shrink: 0; }
         .bookmark h3 { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bookmark p { display: none; }
         #collections {
@@ -1646,24 +1646,27 @@ function createBookmarkElement(bookmark, collectionId) {
 
     const bookmarkIcon = document.createElement('img');
     bookmarkIcon.alt = 'Icon';
+    const fallbackIcon = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L8 12v1c0 1.1.9 2 2 2v3.93zm9.79-2.14c-.19.48-.41.93-.67 1.36l-1.12-1.12V15c0-1.1-.9-2-2-2v-1l3.79-3.79c.13.58.21 1.17.21 1.79 0 4.08-3.05 7.44-7 7.93z"/></svg>';
+    bookmarkIcon.src = fallbackIcon; // Set a fallback icon immediately
 
-    const finalFallback = () => {
-        bookmarkIcon.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24px" height="24px"><path d="M0 0h24v24H0z" fill="none"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L8 12v1c0 1.1.9 2 2 2v3.93zm9.79-2.14c-.19.48-.41.93-.67 1.36l-1.12-1.12V15c0-1.1-.9-2-2-2v-1l3.79-3.79c.13.58.21 1.17.21 1.79 0 4.08-3.05 7.44-7 7.93z"/></svg>';
-        bookmarkIcon.onerror = null; // Prevent infinite loops
-    };
-
-    const tryChromeFavicon = () => {
-        bookmarkIcon.src = `chrome://favicon/size/32/${bookmark.url}`;
-        bookmarkIcon.onerror = finalFallback;
-    };
-
-    try {
-        const domain = new URL(bookmark.url).hostname;
-        bookmarkIcon.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-        bookmarkIcon.onerror = tryChromeFavicon;
-    } catch (e) {
-        // If URL is invalid, go straight to chrome favicon service
-        tryChromeFavicon();
+    if (bookmark.url) {
+        try {
+            // Request the favicon from the background script
+            chrome.runtime.sendMessage({ action: 'fetchFavicon', url: bookmark.url }, (response) => {
+                if (chrome.runtime.lastError) {
+                    // Log error if messaging fails, but the fallback icon is already set
+                    console.warn('Favicon messaging failed:', chrome.runtime.lastError.message);
+                    return;
+                }
+                // If the background script returns a valid data URL, use it
+                if (response && response.dataUrl) {
+                    bookmarkIcon.src = response.dataUrl;
+                } // Otherwise, the fallback icon remains
+            });
+        } catch (e) {
+            // The URL might be invalid, but the fallback is already set.
+            console.warn('Invalid bookmark URL for messaging:', bookmark.url);
+        }
     }
 
     const bookmarkTitle = document.createElement('h3');
@@ -1819,8 +1822,15 @@ function renderCollections() {
         // Event Listeners
         dragHandle.addEventListener('dragstart', dragStartCollection);
         dragHandle.addEventListener('dragend', dragEnd);
-        // The drag handle now also toggles the collection visibility on click
-        dragHandle.addEventListener('click', () => toggleCollection(collection.id));
+        dragHandle.title = 'Drag to reorder collection';
+
+        header.addEventListener('click', (e) => {
+            // Prevent toggling when clicking on the menu button within the header
+            if (e.target.closest('.collection-menu button')) {
+                return;
+            }
+            toggleCollection(collection.id);
+        });
 
         // Assemble the final collection element
         collectionElement.appendChild(header);
