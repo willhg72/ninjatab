@@ -1061,10 +1061,10 @@ document.addEventListener('DOMContentLoaded', () => {
         body.dark-mode .bookmark-menu-dropdown { background-color: #333; border-color: #555; }
         body.dark-mode .bookmark-menu-item:hover { background-color: #444; }
         .bookmark h3 .inline-edit-input { width: 100%; box-sizing: border-box; font-size: 12px; }
-        .bookmark { padding: 6px 8px; height: 36px; display: flex; align-items: center; justify-content: space-between; }
-        .bookmark-header { display: flex; align-items: center; gap: 8px; overflow: hidden; }
+        .bookmark { padding: 6px 8px; min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .bookmark-header { display: flex; align-items: center; gap: 8px; min-width: 0; /* Fix for flexbox text wrapping */ }
         .bookmark-header img { width: 20px; height: 20px; flex-shrink: 0; }
-        .bookmark h3 { margin: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bookmark h3 { margin: 0; font-size: 12px; white-space: normal; word-break: break-word; }
         .bookmark p { display: none; }
         #collections {
             display: flex;
