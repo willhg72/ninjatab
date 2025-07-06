@@ -986,37 +986,7 @@ function addBookmarkEventListeners() {
         if (e.target.matches('.edit-bookmark')) {
             e.stopPropagation();
             e.target.closest('.bookmark-menu-dropdown').style.display = 'none';
-
-            const collection = bookmarkManagerData.collections.find(c => c.id === collectionId);
-            if (!collection) return;
-            const bookmark = collection.bookmarks.find(b => b.id === bookmarkId);
-            if (!bookmark) return;
-
-            const bookmarkTitle = bookmarkElement.querySelector('h3');
-            const currentTitle = bookmark.customTitle || bookmark.title;
-            const escapedTitle = currentTitle.replace(/'/g, "&apos;").replace(/"/g, "&quot;");
-            bookmarkTitle.innerHTML = `<input type='text' value='${escapedTitle}' class='inline-edit-input' />`;
-            const input = bookmarkTitle.querySelector('input');
-            input.focus();
-            input.select();
-
-            const saveChanges = () => {
-                const newTitle = input.value.trim();
-                bookmark.customTitle = newTitle;
-                bookmark.lastModified = Date.now();
-                collection.lastModified = Date.now();
-                saveToLocalStorage();
-                renderCollections();
-            };
-
-            input.addEventListener('blur', saveChanges, { once: true });
-            input.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter') {
-                    saveChanges(); // Directly call saveChanges to ensure it saves
-                } else if (event.key === 'Escape') {
-                    renderCollections(); // Cancel editing and restore original state
-                }
-            });
+            window.openEditModal(collectionId, bookmarkId);
             return;
         }
 
