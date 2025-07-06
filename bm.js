@@ -1134,16 +1134,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    document.getElementById('toggleLeftPane').addEventListener('click', function () {
-        togglePane('leftPane');
-        globalSettings.leftPaneOpen = !document.getElementById('leftPane').classList.contains('closed');
-        saveToLocalStorage();
-    });
-    
-    document.getElementById('toggleRightPane').addEventListener('click', function () {
-        togglePane('rightPane');
-        globalSettings.rightPaneOpen = !document.getElementById('rightPane').classList.contains('closed');
-        saveToLocalStorage();
+    const uiMappings = {
+        'toggleLeftPane': () => {
+            togglePane('leftPane');
+            globalSettings.leftPaneOpen = !document.getElementById('leftPane').classList.contains('closed');
+            saveToLocalStorage();
+        },
+        'toggleRightPane': () => {
+            togglePane('rightPane');
+            globalSettings.rightPaneOpen = !document.getElementById('rightPane').classList.contains('closed');
+            saveToLocalStorage();
+        }
+    };
+
+    Object.keys(uiMappings).forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('click', uiMappings[id]);
+        }
     });
 
     // Funktion för att sätta bakgrundsbild
@@ -1200,63 +1208,79 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    document.getElementById('addCollection').addEventListener('click', addCollection);
-    
-    // Uppdaterade event listeners för att hantera globala inställningar
-    document.getElementById('openInNewTab').addEventListener('change', (e) => {
-        globalSettings.openInNewTab = e.target.checked;
-        bookmarkManagerData.openInNewTab = e.target.checked;
-        saveToLocalStorage();
-    });
+    const eventListeners = {
+        'addCollection': { event: 'click', handler: addCollection },
+        'openInNewTab': { event: 'change', handler: (e) => {
+            globalSettings.openInNewTab = e.target.checked;
+            bookmarkManagerData.openInNewTab = e.target.checked;
+            saveToLocalStorage();
+        }},
+        'closeWhenSaveTab': { event: 'change', handler: (e) => {
+            globalSettings.closeWhenSaveTab = e.target.checked;
+            bookmarkManagerData.closeWhenSaveTab = e.target.checked;
+            saveToLocalStorage();
+        }}
+    };
 
-    document.getElementById('closeWhenSaveTab').addEventListener('change', (e) => {
-        globalSettings.closeWhenSaveTab = e.target.checked;
-        bookmarkManagerData.closeWhenSaveTab = e.target.checked;
-        saveToLocalStorage();
+    Object.keys(eventListeners).forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener(eventListeners[id].event, eventListeners[id].handler);
+        }
     });
 
     // Uppdaterad dark mode event listener
-    document.getElementById('darkMode').addEventListener('change', (e) => {
-        globalSettings.darkMode = e.target.checked;
-        bookmarkManagerData.darkMode = e.target.checked;
-        if (e.target.checked) {
-            document.body.classList.add('dark-mode');
-        } else {
-            document.body.classList.remove('dark-mode');
-        }
-        saveToLocalStorage();
-    });
+    const moreEventListeners = {
+        'darkMode': { event: 'change', handler: (e) => {
+            globalSettings.darkMode = e.target.checked;
+            bookmarkManagerData.darkMode = e.target.checked;
+            document.body.classList.toggle('dark-mode', e.target.checked);
+            saveToLocalStorage();
+        }},
+        'importFile': { event: 'change', handler: (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                importBookmarksFromFile(file);
+            } else {
+                alert('No file selected.');
+            }
+        }},
+        'exportButton': { event: 'click', handler: exportBookmarks },
+        'importTobyFile': { event: 'change', handler: importTobyBookmarks },
+        'deleteAllButton': { event: 'click', handler: deleteAllCollections }
+    };
 
-    document.getElementById('importFile').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            importBookmarksFromFile(file);
-        } else {
-            alert('No file selected.');
+    Object.keys(moreEventListeners).forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener(moreEventListeners[id].event, moreEventListeners[id].handler);
         }
     });
-
-    document.getElementById('exportButton').addEventListener('click', exportBookmarks);
-    document.getElementById('importTobyFile').addEventListener('change', importTobyBookmarks);
-    document.getElementById('deleteAllButton').addEventListener('click', deleteAllCollections);
 
     // GitHub settings event listeners
-    document.getElementById('githubUsername').addEventListener('change', (e) => {
-        bookmarkManagerData.githubConfig.username = e.target.value;
-        saveToLocalStorage();
-        updateSyncButtonVisibility();
-    });
+    const githubEventListeners = {
+        'githubUsername': { event: 'change', handler: (e) => {
+            bookmarkManagerData.githubConfig.username = e.target.value;
+            saveToLocalStorage();
+            updateSyncButtonVisibility();
+        }},
+        'githubRepo': { event: 'change', handler: (e) => {
+            bookmarkManagerData.githubConfig.repo = e.target.value;
+            saveToLocalStorage();
+            updateSyncButtonVisibility();
+        }},
+        'githubPat': { event: 'change', handler: (e) => {
+            bookmarkManagerData.githubConfig.pat = e.target.value;
+            saveToLocalStorage();
+            updateSyncButtonVisibility();
+        }}
+    };
 
-    document.getElementById('githubRepo').addEventListener('change', (e) => {
-        bookmarkManagerData.githubConfig.repo = e.target.value;
-        saveToLocalStorage();
-        updateSyncButtonVisibility();
-    });
-
-    document.getElementById('githubPat').addEventListener('change', (e) => {
-        bookmarkManagerData.githubConfig.pat = e.target.value;
-        saveToLocalStorage();
-        updateSyncButtonVisibility();
+    Object.keys(githubEventListeners).forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener(githubEventListeners[id].event, githubEventListeners[id].handler);
+        }
     });
 
     // Funktion för att uppdatera sync-knappens synlighet
@@ -1284,23 +1308,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Initialisera GitHub-fälten och sync-knappens synlighet
-    document.getElementById('githubUsername').value = bookmarkManagerData.githubConfig.username || '';
-    document.getElementById('githubRepo').value = bookmarkManagerData.githubConfig.repo || '';
-    document.getElementById('githubPat').value = bookmarkManagerData.githubConfig.pat || '';
+    const githubUsernameEl = document.getElementById('githubUsername');
+    if (githubUsernameEl) githubUsernameEl.value = bookmarkManagerData.githubConfig.username || '';
+
+    const githubRepoEl = document.getElementById('githubRepo');
+    if (githubRepoEl) githubRepoEl.value = bookmarkManagerData.githubConfig.repo || '';
+
+    const githubPatEl = document.getElementById('githubPat');
+    if (githubPatEl) githubPatEl.value = bookmarkManagerData.githubConfig.pat || '';
+
     updateSyncButtonVisibility();
 
-    const searchBox = document.getElementById('searchBox');    
+    const searchBox = document.getElementById('searchBox');
     if (searchBox) {
+        console.log('[Debug] Found searchBox element. Attaching listener and setting focus.');
         setTimeout(() => {
-            console.log('Focusing on search box');
             searchBox.focus();
-        }, 100); // En fördröjning på 100 millisekunder (justera vid behov)
-    }
+        }, 100);
 
-    document.getElementById('searchBox').addEventListener('input', function() {
-        const searchTerm = this.value.trim();
-        applyFilter(searchTerm);
-    });
+        searchBox.addEventListener('input', function() {
+            const searchTerm = this.value.trim();
+            applyFilter(searchTerm);
+        });
+    } else {
+        console.error('[Debug] Could not find searchBox element.');
+    }
 
     function applyFilter(searchTerm) {
         const collections = document.querySelectorAll('.collection');
@@ -2785,20 +2817,22 @@ function startConfetti(options = {}) {
   
   // Använd event listeners på knappen
   const supportButton = document.getElementById('supportButton');
-let confettiTimeout;
+  let confettiTimeout;
 
-supportButton.addEventListener('mouseenter', function(e) {
-  // Beräkna muspositionen som en normaliserad koordinat
-  const origin = {
-    x: e.clientX / window.innerWidth,
-    y: e.clientY / window.innerHeight
-  };
+  if (supportButton) {
+    supportButton.addEventListener('mouseenter', function(e) {
+      // Beräkna muspositionen som en normaliserad koordinat
+      const origin = {
+        x: e.clientX / window.innerWidth,
+        y: e.clientY / window.innerHeight
+      };
 
-  confettiTimeout = setTimeout(() => {
-    startConfetti({ particleCount: 100, duration: 3000, origin: origin });
-  }, 1000);
-});
+      confettiTimeout = setTimeout(() => {
+        startConfetti({ particleCount: 100, duration: 3000, origin: origin });
+      }, 1000);
+    });
 
-supportButton.addEventListener('mouseleave', function() {
-  clearTimeout(confettiTimeout);
-});
+    supportButton.addEventListener('mouseleave', function() {
+      clearTimeout(confettiTimeout);
+    });
+  }
