@@ -1090,10 +1090,8 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchChromeTabs();
     setInterval(fetchChromeTabs, 5000);
 
-    const manifestData = chrome.runtime.getManifest();
-    const version = manifestData.version;
-    const versionDisplay = document.getElementById('versionDisplay');
-    versionDisplay.textContent = `TheTab.ninja version: ${version}`;
+    const manifest = chrome.runtime.getManifest();
+    document.getElementById('versionDisplay').textContent = `Bookmarks.Organizer version: ${manifest.version}`;
     
     const backgroundThumbnailsContainer = document.getElementById('backgroundThumbnails');
     // Lista med filnamn för dina bakgrundsbilder (se till att de finns i 'images/' mappen)
